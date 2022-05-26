@@ -1,28 +1,15 @@
-import os
 import sys
 from pathlib import Path
-from datetime import datetime
+import logging
 
-from PIL import Image
 import cv2
 
 import numpy as np
+from PIL import Image
 
-
-class Saver:
-    def __init__(self, folder):
-        os.makedirs(folder, exist_ok=True)
-        self.__current_count = 0
-        self.__folder = Path(folder)
-
-    def trigger(self, image, frame_number, delta_info):
-        self.__current_count += 1
-        timestamp = str(datetime.now())
-
-        path = self.__folder / f"output_{timestamp}_{self.__current_count}_{frame_number}.jpg"
-        # print(f"Triggered {path} {delta_info}")
-        pil_image = Image.fromarray(image)
-        pil_image.save(str(path), format="jpeg")
+from cmd import to_parts
+from history import History, Saver
+from video import VideoFeeder
 
 
 class Parser:
@@ -46,73 +33,80 @@ class Parser:
         if trigger:
             delta_info = f"current={new_value} previous={self.__avg}"
             self.__avg = new_value
-            self.__trigger.trigger(cropped, frame_number, delta_info)
+            self.__trigger.trigger(self.__camera_id, cropped, frame_number, delta_info)
 
 
 def avg_metric(image):
     return np.mean(image)
 
 
-def parse_video(parsers):
-    cap = cv2.VideoCapture('input/20220526_062621.mp4')
-
-    if not cap.isOpened():
-        print("Error opening video stream or file")
-        exit(1)
-
+def parse_video(feeder, parsers):
     frame_number = 0
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if ret:
-            frame_number += 1
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            # print(f"Frame {frame_number} {type(frame)}")
-            # cv2.imshow('Frame', frame)
-            for parser in parsers:
-                parser.check(gray, frame_number)
-        else:
+    while True:
+        frame = feeder.next()
+        if frame is None:
             break
+        frame_number += 1
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        logging.info(f"Frame {frame_number} {type(frame)}")
+        for parser in parsers:
+            parser.check(gray, frame_number)
+
     if 'gray' in locals():
         for parser in parsers:
             parser.check(gray, frame_number, force=True)
 
-    cap.release()
-    # cv2.destroyAllWindows()
 
+def parts_to_parsers(parts):
+    output = Path("output/")
+    history = History(output)
+    saver = Saver(history, output)
 
-def to_int(params):
-    return [int(p) for p in params]
-
-
-def main(args):
-    parts = [to_int(arg.split(":")) for arg in args]
     parsers = []
-
     for i, part in enumerate(parts):
-        saver = Saver(f"output/camera_{i}/")
         parser = Parser(i, avg_metric, 0.08, window=part, trigger=saver)
         parsers.append(parser)
-
-    parse_video(parsers)
-    # parse_camera()
+    return parsers
 
 
-def help():
+def run(feeder, parts):
+    parsers = parts_to_parsers(parts)
+    parse_video(feeder, parsers)
+
+
+def helper():
     print("Proper usage:")
     print("Screenshot: screenshot")
     print("One camera: parse x1:x2:y1:y2")
-    print("One camera: parse x1:x2:y1:y2 x1:x2:y1:y1")
+    print("Multiple cameras: parse x1:x2:y1:y2 x1:x2:y1:y1")
     exit(0)
 
 
-if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        help()
-    if sys.argv[1] == "screenshot":
-        pass
-    elif sys.argv[1] == "parse":
-        main(sys.argv[2:])
-    else:
-        help()
+def screenshot(feeder):
+    frame = feeder.next()
+    pil_image = Image.fromarray(frame)
+    pil_image.save("output/output.jpg", format="jpeg")
 
-# TODO read pipy camera
+
+def get_feeder():
+    # from camera import CameraFeeder()
+    # return CameraFeeder()
+    return VideoFeeder('input/20220526_062621.mp4')
+
+
+def main():
+    if len(sys.argv) < 2:
+        helper()
+
+    feeder = get_feeder()
+    if sys.argv[1] == "screenshot":
+        screenshot(feeder)
+    elif sys.argv[1] == "parse":
+        arg_parts = to_parts(sys.argv[2:])
+        run(feeder, arg_parts)
+    else:
+        helper()
+
+
+if __name__ == '__main__':
+    main()
