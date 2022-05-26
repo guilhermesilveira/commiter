@@ -26,6 +26,7 @@ mkdir -p work
 cd work
 
 git clone git@github.com:guilhermesilveira/commiter.git
+sh commiter/install/install-opencv2.sh
 sh commiter/install/install-libgit2.sh
 cd commiter
 sh install/build.sh

@@ -89,9 +89,9 @@ def screenshot(feeder):
 
 
 def get_feeder():
-    # from camera import CameraFeeder()
-    # return CameraFeeder()
-    return VideoFeeder('input/20220526_062621.mp4')
+    from camera import CameraFeeder
+    return CameraFeeder()
+    # return VideoFeeder('input/20220526_062621.mp4')
 
 
 def main():
