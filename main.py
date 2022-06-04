@@ -77,8 +77,8 @@ def run(feeder, parts):
 def helper():
     print("Proper usage:")
     print("Screenshot: screenshot")
-    print("One camera: parse x1:x2:y1:y2")
-    print("Multiple cameras: parse x1:x2:y1:y2 x1:x2:y1:y1")
+    print("One camera: parse 0:960:0:1080")
+    print("Multiple cameras: parse 0:960:0:1080 960:1920:0:1080")
     exit(0)
 
 
